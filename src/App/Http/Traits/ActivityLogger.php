@@ -39,7 +39,7 @@ trait ActivityLogger
                         $verb = 'Searched requirements';
                     }
                     if (Request::segment(2) == 'req') {
-                        $verb = 'Viewed requirement '.Request::segment(3).']';
+                        $verb = 'Viewed requirement '.Request::segment(3).'';
                     }
                     if (Request::segment(4) == 'attach') {
                         $verb = 'Added requirement(s) '.$_GET['req_ids'].' to list';
