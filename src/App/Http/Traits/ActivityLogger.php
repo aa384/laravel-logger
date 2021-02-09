@@ -2,86 +2,142 @@
 
 namespace jeremykenedy\LaravelLogger\App\Http\Traits;
 
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Request;
-use Illuminate\Support\Facades\Validator;
 use Jaybizzle\LaravelCrawlerDetect\Facades\LaravelCrawlerDetect as Crawler;
+use jeremykenedy\LaravelLogger\App\Models\Activity;
+use Validator;
+use Auth;
 
 trait ActivityLogger
 {
     /**
      * Laravel Logger Log Activity.
      *
-     * @param null $description
-     * @param null $details
+     * @param string $description
      *
      * @return void
      */
-    public static function activity($description = null, $details = null)
+    public static function activity($description = null)
     {
+
         $userType = trans('LaravelLogger::laravel-logger.userTypes.guest');
         $userId = null;
-
         if (Auth::check()) {
             $userType = trans('LaravelLogger::laravel-logger.userTypes.registered');
             $userIdField = config('LaravelLogger.defaultUserIDField');
             $userId = Request::user()->{$userIdField};
-        }
 
-        if (Crawler::isCrawler()) {
-            $userType = trans('LaravelLogger::laravel-logger.userTypes.crawler');
-            if (is_null($description)) {
-                $description = $userType.' '.trans('LaravelLogger::laravel-logger.verbTypes.crawled').' '.Request::fullUrl();
+            //log events in api 
+            if (str_starts_with(request()->path(), 'api')) {
+
+
+                    if (Request::segment(2) == 'cm_contact') {
+                        $verb = 'Sent contact form [' . Request::path().']';
+                    }
+                    if (Request::segment(2) == 'reqs') {
+                        $verb = 'Searched requirements';
+                    }
+                    if (Request::segment(2) == 'req') {
+                        $verb = 'Viewed requirement '.Request::segment(3).']';
+                    }
+                    if (Request::segment(4) == 'attach') {
+                        $verb = 'Added requirement(s) '.$_GET['req_ids'].' to list';
+                    }
+                    if (Request::segment(4) == 'detach') {
+                        $verb = 'Deleted requirement(s) '.$_GET['req_ids'].' from list';
+                    }
+
+if (isset($verb)){
+                    $description = $verb;
+                
+
+                $data = [
+                    'description'   => $description,
+                    'userType'      => $userType,
+                    'userId'        => $userId,
+                    'route'         => Request::fullUrl(),
+                    'ipAddress'     => Request::ip(),
+                    'userAgent'     => Request::header('user-agent'),
+                    'locale'        => Request::header('accept-language'),
+                    'referer'       => Request::header('referer'),
+                    'methodType'    => Request::method(),
+
+                ];
+
+
+                // Validation Instance
+                $validator = Validator::make($data, Activity::Rules([]));
+                if ($validator->fails()) {
+                    $errors = self::prepareErrorMessage($validator->errors(), $data);
+                    if (config('LaravelLogger.logDBActivityLogFailuresToFile')) {
+                        Log::error('Failed to record activity event. Failed Validation: ' . $errors);
+                    }
+                } else {
+                    self::storeActivity($data);
+                }
             }
         }
-
-        if (!$description) {
-            switch (strtolower(Request::method())) {
-                case 'post':
-                    $verb = trans('LaravelLogger::laravel-logger.verbTypes.created');
-                    break;
-
-                case 'patch':
-                case 'put':
-                    $verb = trans('LaravelLogger::laravel-logger.verbTypes.edited');
-                    break;
-
-                case 'delete':
-                    $verb = trans('LaravelLogger::laravel-logger.verbTypes.deleted');
-                    break;
-
-                case 'get':
-                default:
-                    $verb = trans('LaravelLogger::laravel-logger.verbTypes.viewed');
-                    break;
-            }
-
-            $description = $verb.' '.Request::path();
         }
 
-        $data = [
-            'description'   => $description,
-            'details'       => $details,
-            'userType'      => $userType,
-            'userId'        => $userId,
-            'route'         => Request::fullUrl(),
-            'ipAddress'     => Request::ip(),
-            'userAgent'     => Request::header('user-agent'),
-            'locale'        => Request::header('accept-language'),
-            'referer'       => Request::header('referer'),
-            'methodType'    => Request::method(),
-        ];
+        if (!str_starts_with(request()->path(), 'api')) {
 
-        // Validation Instance
-        $validator = Validator::make($data, config('laravel-logger.defaultActivityModel')::rules());
-        if ($validator->fails()) {
-            $errors = self::prepareErrorMessage($validator->errors(), $data);
-            if (config('LaravelLogger.logDBActivityLogFailuresToFile')) {
-                Log::error('Failed to record activity event. Failed Validation: '.$errors);
+
+            if (Crawler::isCrawler()) {
+                $userType = trans('LaravelLogger::laravel-logger.userTypes.crawler');
+                if (is_null($description)) {
+                    $description = $userType . ' ' . trans('LaravelLogger::laravel-logger.verbTypes.crawled') . ' ' . Request::fullUrl();
+                }
             }
-        } else {
-            self::storeActivity($data);
+
+
+            if (!$description) {
+                switch (strtolower(Request::method())) {
+                    case 'post':
+                        $verb = trans('LaravelLogger::laravel-logger.verbTypes.created');
+                        break;
+
+                    case 'patch':
+                    case 'put':
+                        $verb = trans('LaravelLogger::laravel-logger.verbTypes.edited');
+                        break;
+
+                    case 'delete':
+                        $verb = trans('LaravelLogger::laravel-logger.verbTypes.deleted');
+                        break;
+
+                    case 'get':
+                    default:
+                        $verb = trans('LaravelLogger::laravel-logger.verbTypes.viewed');
+                        break;
+                }
+
+                $description = $verb . ' ' . Request::path();
+            }
+
+            $data = [
+                'description'   => $description,
+                'userType'      => $userType,
+                'userId'        => $userId,
+                'route'         => Request::fullUrl(),
+                'ipAddress'     => Request::ip(),
+                'userAgent'     => Request::header('user-agent'),
+                'locale'        => Request::header('accept-language'),
+                'referer'       => Request::header('referer'),
+                'methodType'    => Request::method(),
+
+            ];
+
+            // Validation Instance
+            $validator = Validator::make($data, Activity::Rules([]));
+            if ($validator->fails()) {
+                $errors = self::prepareErrorMessage($validator->errors(), $data);
+                if (config('LaravelLogger.logDBActivityLogFailuresToFile')) {
+                    Log::error('Failed to record activity event. Failed Validation: ' . $errors);
+                }
+            } else {
+                self::storeActivity($data);
+            }
         }
     }
 
@@ -94,9 +150,8 @@ trait ActivityLogger
      */
     private static function storeActivity($data)
     {
-        config('laravel-logger.defaultActivityModel')::create([
+        Activity::create([
             'description'   => $data['description'],
-            'details'       => $data['details'],
             'userType'      => $data['userType'],
             'userId'        => $data['userId'],
             'route'         => $data['route'],
