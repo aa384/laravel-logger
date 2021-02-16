@@ -27,7 +27,6 @@ trait ActivityLogger
             $userType = trans('LaravelLogger::laravel-logger.userTypes.registered');
             $userIdField = config('LaravelLogger.defaultUserIDField');
             $userId = Request::user()->{$userIdField};
-
             //log events in api 
             if (str_starts_with(request()->path(), 'api')) {
 
@@ -42,17 +41,17 @@ trait ActivityLogger
                         $verb = 'Viewed requirement '.Request::segment(3);
                     }
                     if (Request::segment(4) == 'attach') {
-                        $verb = 'Added requirement(s) '.$_GET['req_ids'].' to list';
+                        $verb = 'Added requirement(s) '.Request::get('req_ids').' to list';
                     }
                     if (Request::segment(4) == 'detach') {
-                        $verb = 'Deleted requirement(s) '.$_GET['req_ids'].' from list';
+                        $verb = 'Deleted requirement(s) '.Request::get('req_ids').' from list';
                     }
 
-if (isset($verb)){
+            if (isset($verb)){
                     $description = $verb;
                 
 
-                $data = [
+                    $data = [
                     'description'   => $description,
                     'userType'      => $userType,
                     'userId'        => $userId,
@@ -63,7 +62,7 @@ if (isset($verb)){
                     'referer'       => Request::header('referer'),
                     'methodType'    => Request::method(),
 
-                ];
+                 ];
 
 
                 // Validation Instance
