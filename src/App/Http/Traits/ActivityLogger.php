@@ -29,22 +29,22 @@ trait ActivityLogger
             $userId = Request::user()->{$userIdField};
             //log events in api 
             if (str_starts_with(request()->path(), 'api')) {
-
+                    $site = Request::get('site_tag');
 
                     if (Request::segment(2) == 'cm_contact') {
-                        $verb = 'Sent contact form [' . Request::path().']';
+                        $verb = 'Sent contact form [' . $site .']';
                     }
                     if (Request::segment(2) == 'reqs') {
-                        $verb = 'Searched requirements';
+                        $verb = 'Searched requirements ['.$site .']';
                     }
                     if (Request::segment(2) == 'req') {
-                        $verb = 'Viewed requirement '.Request::segment(3);
+                        $verb = 'Viewed requirement '.Request::segment(3).'['.$site .']';
                     }
                     if (Request::segment(4) == 'attach') {
-                        $verb = 'Added requirement(s) '.Request::get('req_ids').' to list';
+                        $verb = 'Added requirement(s) '.Request::get('req_ids').' to list ['.$site .']';
                     }
                     if (Request::segment(4) == 'detach') {
-                        $verb = 'Deleted requirement(s) '.Request::get('req_ids').' from list';
+                        $verb = 'Deleted requirement(s) '.Request::get('req_ids').' from list ['.$site .']';
                     }
 
             if (isset($verb)){
